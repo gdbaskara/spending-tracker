@@ -48,6 +48,10 @@ export function Home({
             boxShadow: "0 10px 30px rgba(196,170,142,0.14)",
             position: "relative",
             overflow: "hidden",
+            // overflow:hidden zeroes a flex item's implied min-height, so iOS
+            // Safari collapses this card to a strip inside the column flex.
+            // Pin it so it always keeps its content height.
+            flexShrink: 0,
           }}
         >
           <div className="hero-sheen" />
