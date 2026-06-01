@@ -321,21 +321,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (sb) {
           const saved = await db.insertExpense(sb, householdId, base);
           if (saved) {
-            // Upload the receipt under the new id, then persist its path.
+            // Upload the receipt under the new id, then persist its path
+            // (immutably — never mutate the row returned by the data layer).
+            let stored = saved;
             if (input.receiptBlob) {
               const path = await db.uploadReceipt(sb, householdId, saved.id, input.receiptBlob);
               if (path) {
-                saved.receipt_path = path;
-                await db.updateExpense(sb, householdId, saved);
+                stored = { ...saved, receipt_path: path };
+                await db.updateExpense(sb, householdId, stored);
               }
             }
-            setExpenses((prev) => [saved, ...prev]);
+            setExpenses((prev) => [stored, ...prev]);
             return;
           }
         }
       }
       // Local mode: keep the image inline as a data URL.
-      const localReceipt = input.receiptBlob ? await blobToDataUrl(input.receiptBlob) : null;
+      const localReceipt = input.receiptBlob ? await blobToDataUrl(input.receiptBlob).catch(() => null) : null;
       setExpenses((prev) => [{ ...base, id: uid("e"), receipt_path: localReceipt }, ...prev]);
     },
     [mode, householdId]
@@ -359,7 +361,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (sb && householdId) {
           receipt_path = (await db.uploadReceipt(sb, householdId, id, input.receiptBlob)) ?? receipt_path;
         } else {
-          receipt_path = await blobToDataUrl(input.receiptBlob);
+          receipt_path = await blobToDataUrl(input.receiptBlob).catch(() => receipt_path);
         }
       }
 
@@ -408,6 +410,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (mode === "live" && householdId) {
         const sb = getSupabase();
         if (sb) await db.deleteExpense(sb, householdId, id);
+        // The receipt object is intentionally NOT deleted here so "Urungkan"
+        // (undo) can restore the expense with its image intact. This leaves a
+        // small orphan only when a delete is not undone; RLS still scopes it to
+        // the household. (Future: sweep orphans after the undo window.)
       }
       if (removed) {
         showToast("Transaksi dihapus", { actionLabel: "Urungkan", onAction: () => void restoreExpense(removed) });

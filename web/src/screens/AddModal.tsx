@@ -220,7 +220,7 @@ export function AddModal({
         <div style={{ marginTop: 8 }}>
           <ReceiptField
             src={receiptSrc}
-            busy={receiptBusy}
+            busy={receiptBusy || scanning}
             onPick={addReceipt}
             onCrop={() => receiptSrc && setCropSrc(receiptSrc)}
             onRemove={onRemoveReceipt}

@@ -87,6 +87,10 @@ export async function POST(req: NextRequest) {
     imageBase64 = String(body.image ?? "");
     mimeType = String(body.mimeType ?? "image/jpeg");
     if (!imageBase64) throw new Error("no image");
+    // Only forward known image types to Gemini (don't proxy arbitrary content).
+    if (!new Set(["image/jpeg", "image/webp", "image/png"]).has(mimeType)) {
+      throw new Error("bad mime");
+    }
     // strip a data URL prefix if present
     const comma = imageBase64.indexOf(",");
     if (imageBase64.startsWith("data:") && comma !== -1) {
@@ -129,18 +133,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (!geminiRes.ok) {
-    const detail = await geminiRes.text().catch(() => "");
-    // Friendly, actionable messages for the common account-side failures.
+    // Drain the upstream body but do NOT forward it — Gemini error payloads can
+    // leak model/billing/config details. Return only a friendly message.
+    await geminiRes.text().catch(() => "");
     let msg = "Layanan OCR lagi bermasalah, coba lagi nanti.";
     if (geminiRes.status === 429) {
       msg = "Kuota OCR habis / belum aktif. Cek billing di Google AI Studio, lalu coba lagi.";
     } else if (geminiRes.status === 400 || geminiRes.status === 403) {
       msg = "API key OCR tidak valid. Periksa GEMINI_API_KEY.";
     }
-    return NextResponse.json(
-      { error: msg, status: geminiRes.status, detail: detail.slice(0, 200) },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: msg, status: geminiRes.status }, { status: 502 });
   }
 
   const data = await geminiRes.json().catch(() => null);

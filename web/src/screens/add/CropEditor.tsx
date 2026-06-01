@@ -20,26 +20,34 @@ export function CropEditor({ src, onDone, onCancel }: CropEditorProps) {
   const [aspect, setAspect] = React.useState(3 / 4);
   const [area, setArea] = React.useState<CropArea | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(false);
 
   // Match the crop frame to the photo's own proportions so nothing is cropped
   // away by default; the user zooms/pans/rotates to refine.
   React.useEffect(() => {
+    let alive = true;
     const img = new Image();
-    img.onload = () => setAspect(img.width / img.height || 3 / 4);
+    img.onload = () => alive && setAspect(img.width / img.height || 3 / 4);
     img.src = src;
+    return () => {
+      alive = false;
+    };
   }, [src]);
 
   const onComplete = React.useCallback((_area: unknown, areaPixels: CropArea) => setArea(areaPixels), []);
 
-  const apply = async () => {
+  const apply = React.useCallback(async () => {
     if (!area || busy) return;
     setBusy(true);
+    setErr(false);
     try {
       onDone(await cropImage(src, area, rotation));
+    } catch {
+      setErr(true);
     } finally {
       setBusy(false);
     }
-  };
+  }, [area, busy, src, rotation, onDone]);
 
   const btn: React.CSSProperties = {
     border: "none",
@@ -85,14 +93,21 @@ export function CropEditor({ src, onDone, onCancel }: CropEditorProps) {
           aria-label="Zoom"
           style={{ width: "100%", accentColor: UI.accent }}
         />
+        {err && (
+          <div style={{ color: "#FFD2C2", fontSize: 13, textAlign: "center" }}>Gagal memproses gambar, coba lagi.</div>
+        )}
         <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => setRotation((r) => (r + 90) % 360)} style={btn}>
+          <button onClick={() => setRotation((r) => (r + 90) % 360)} disabled={busy} style={btn}>
             Putar 90°
           </button>
-          <button onClick={onCancel} style={btn}>
+          <button onClick={onCancel} disabled={busy} style={btn}>
             Batal
           </button>
-          <button onClick={apply} disabled={busy} style={{ ...btn, flex: 1, background: UI.accent }}>
+          <button
+            onClick={apply}
+            disabled={busy || !area}
+            style={{ ...btn, flex: 1, background: UI.accent, opacity: busy || !area ? 0.6 : 1 }}
+          >
             {busy ? "Menyimpan…" : "Selesai"}
           </button>
         </div>

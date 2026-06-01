@@ -22,6 +22,25 @@ export function ReceiptField({ src, busy, onPick, onCrop, onRemove, onScan, canS
   const galleryRef = React.useRef<HTMLInputElement>(null); // camera OR gallery
   const [viewing, setViewing] = React.useState(false);
 
+  // Never leave the lightbox open for an image that's gone (e.g. after removal).
+  React.useEffect(() => {
+    if (!src) setViewing(false);
+  }, [src]);
+
+  // Close the lightbox on Escape. Capture-phase + stopPropagation so the host
+  // modal's own Escape handler doesn't also fire and close the whole modal.
+  React.useEffect(() => {
+    if (!viewing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setViewing(false);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [viewing]);
+
   const pick = (scan: boolean) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -103,6 +122,9 @@ export function ReceiptField({ src, busy, onPick, onCrop, onRemove, onScan, canS
       {viewing && src && (
         <div
           onClick={() => setViewing(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pratinjau struk"
           style={{ position: "fixed", inset: 0, zIndex: 320, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
           className="anim-fade"
         >
