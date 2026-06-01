@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Celengin — Spending Tracker (Web)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: "Plus Jakarta Sans", sans-serif; background: #FBF5EF; color: #3F3530; -webkit-font-smoothing: antialiased; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #E5DACE; border-radius: 999px; }
+  input { font-family: inherit; }
+  button { font-family: inherit; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar { width: 252px; flex-shrink: 0; background: #fff; border-right: 1px solid #F1E9E1; display: flex; flex-direction: column; padding: 22px 16px; position: sticky; top: 0; height: 100vh; gap: 8px; }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px 18px; }
+  .brand-logo { width: 48px; height: 48px; border-radius: 16px; background: #FDECF2; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .add-btn { display: flex; align-items: center; justify-content: center; gap: 9px; border: none; border-radius: 18px; padding: 14px; margin: 4px 4px 14px; background: linear-gradient(135deg,#FF9E6B,#FF7E5B); color: #fff; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 16px; cursor: pointer; box-shadow: 0 8px 20px rgba(255,126,91,0.4); transition: transform .15s; }
+  .add-btn:hover { transform: translateY(-1px); }
+  .nav { display: flex; flex-direction: column; gap: 4px; }
+  .nav-item { display: flex; align-items: center; gap: 13px; padding: 13px 14px; border-radius: 15px; cursor: pointer; font-size: 15px; font-weight: 600; color: #A99E94; transition: all .15s; }
+  .nav-item:hover { background: #FBF5EF; }
+  .nav-item.active { background: #FFE7DB; color: #F0703F; }
+  .sidebar-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 14px 10px 4px; border-top: 1px solid #F1E9E1; }
+
+  /* ── Main ── */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 22px 32px; max-width: 1200px; width: 100%; margin: 0 auto;
+    background: rgba(251,245,239,0.86); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .month-pill { background: #fff; border-radius: 999px; padding: 10px 18px; font-size: 14px; font-weight: 600; color: #6b5e57; box-shadow: 0 4px 12px rgba(196,170,142,0.12); white-space: nowrap; }
+  .topbar-add { display: inline-flex; align-items: center; gap: 8px; border: none; border-radius: 14px; padding: 11px 18px; background: #FF8A5B; color: #fff; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 14.5px; cursor: pointer; box-shadow: 0 6px 16px rgba(255,138,91,0.35); transition: transform .15s; }
+  .topbar-add:hover { transform: translateY(-1px); }
+  .content { padding: 8px 32px 60px; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+  .dash { display: grid; grid-template-columns: 1.45fr 1fr; gap: 22px; align-items: start; }
+  .rgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: stretch; }
+
+  /* ── Mobile bottom nav (hidden on desktop) ── */
+  .bottomnav { display: none; }
+
+  /* ── iPad portrait & small laptops: collapse to icon rail ── */
+  @media (max-width: 1080px) {
+    .sidebar { width: 86px; padding: 22px 12px; align-items: center; }
+    .sidebar-label { display: none; }
+    .brand { justify-content: center; padding: 4px 0 18px; }
+    .add-btn { margin: 4px 0 14px; width: 54px; height: 54px; padding: 0; border-radius: 18px; align-self: center; }
+    .nav { width: 100%; align-items: center; }
+    .nav-item { justify-content: center; padding: 13px; width: 54px; }
+    .sidebar-foot { flex-direction: column; gap: 6px; padding: 14px 0 4px; }
+  }
+
+  /* ── Phones: bottom tab + single column ── */
+  @media (max-width: 720px) {
+    .sidebar { display: none; }
+    .topbar { padding: 18px 18px; }
+    .topbar-add span { display: none; }
+    .topbar-add { padding: 11px; border-radius: 50%; }
+    .month-pill { display: none; }
+    .content { padding: 6px 16px 120px; }
+    .dash, .rgrid { grid-template-columns: 1fr; }
+    .bottomnav { display: flex; position: fixed; left: 12px; right: 12px; bottom: 16px; height: 64px; background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 26px; box-shadow: 0 12px 30px rgba(120,90,60,0.18);
+      align-items: center; padding: 0 6px; z-index: 100; }
+    .bn-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; font-size: 10.5px; font-weight: 600; color: #BDB2A7; }
+    .bn-item.active { color: #F0703F; }
+    .bn-fab { width: 56px; height: 56px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(135deg,#FF9E6B,#FF7E5B);
+      display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 8px 20px rgba(255,126,91,0.5);
+      transform: translateY(-14px); border: 4px solid #FBF5EF; }
+    .add-modal { max-width: 100% !important; max-height: 100vh !important; height: 100vh; border-radius: 0 !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="app/data.js"></script>
+<script type="text/babel" src="app/components.jsx"></script>
+<script type="text/babel" src="app/web-home.jsx"></script>
+<script type="text/babel" src="app/web-reports.jsx"></script>
+<script type="text/babel" src="app/web-settle.jsx"></script>
+<script type="text/babel" src="app/web-settings.jsx"></script>
+<script type="text/babel" src="app/web-add.jsx"></script>
+<script type="text/babel" src="app/web-app.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+  ReactDOM.createRoot(document.getElementById('root')).render(<WebApp />);
+</script>
+</body>
+</html>

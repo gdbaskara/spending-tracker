@@ -1,0 +1,55 @@
+# ── Secrets (NEVER commit) ───────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+
+# ── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+
+# ── Next.js / build output ───────────────────────────────────────────────────
+.next/
+**/.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Netlify ──────────────────────────────────────────────────────────────────
+.netlify/
+**/.netlify/
+
+# ── Supabase CLI scratch (never commit) ──────────────────────────────────────
+supabase/.temp/
+supabase/.branches/
+**/.temp/
+
+# ── Testing / coverage ───────────────────────────────────────────────────────
+coverage/
+*.lcov
+
+# ── Graphify analysis artifacts (local tooling output) ───────────────────────
+graphify-out/
+.graphify_*.json
+
+# ── Claude Code local config / session data ──────────────────────────────────
+.claude/
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── OS / editor cruft ────────────────────────────────────────────────────────
+.DS_Store
+*.pem
+.idea/
+.vscode/
+*.swp
