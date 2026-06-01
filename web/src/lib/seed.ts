@@ -1,6 +1,6 @@
 // Seed data — ported verbatim from the design's data.js. Used as the offline
 // fallback and as the source for the Supabase seed migration. Money in rupiah.
-import { computeShares } from "./engine";
+import { computeShares, todayISO, shiftISO, diffDays } from "./engine";
 import type {
   Category,
   Expense,
@@ -29,6 +29,16 @@ export const CATEGORIES: Record<string, Category> = {
 
 export const CATEGORY_LIST: Category[] = Object.values(CATEGORIES);
 
+// ── Keep the demo "current" ──────────────────────────────────────────────────
+// The sample data was authored with this as the most-recent date ("today").
+// At runtime we shift every sample date by (real today - anchor), so the demo
+// always shows recent activity ending today, no matter when the app is opened
+// or deployed. Amounts/payers/splits are untouched, so the documented demo
+// balance (Mei utang Rp144.250 ke Baskara) is preserved.
+const SEED_ANCHOR = "2026-05-30";
+const SEED_OFFSET = diffDays(todayISO(), SEED_ANCHOR);
+const rel = (iso: string): string => shiftISO(iso, SEED_OFFSET);
+
 // helper to build an expense with computed shares
 function exp(
   id: string,
@@ -42,7 +52,7 @@ function exp(
 ): Expense {
   return {
     id,
-    spent_at,
+    spent_at: rel(spent_at),
     category_id,
     payer_id,
     amount,
@@ -94,7 +104,7 @@ export const SEED_EXPENSES: Expense[] = [
 ];
 
 export const SEED_SETTLEMENTS: Settlement[] = [
-  { id: "s1", from_id: "mei", to_id: "bas", amount: 1_500_000, note: "Lunasin sewa", settled_at: "2026-05-02" },
+  { id: "s1", from_id: "mei", to_id: "bas", amount: 1_500_000, note: "Lunasin sewa", settled_at: rel("2026-05-02") },
 ];
 
 export const SEED_RECURRING: Recurring[] = [
@@ -105,18 +115,21 @@ export const SEED_RECURRING: Recurring[] = [
   { id: "r5", description: "Spotify + Netflix", category_id: "tagihan", payer_id: "bas", amount: 100_000, split_type: "equal", day: 8, active: false },
 ];
 
-// 12-month trend; current month (Mei) is filled at runtime from real expenses.
+// 12-month baseline totals (Jan..Des). Used only to decorate empty months that
+// fall BEFORE the current month in the demo year, so the yearly chart looks
+// alive regardless of when the app is opened. The current month is filled at
+// runtime from real expenses; future months stay empty. See store.tsx.
 export const MONTHLY_TREND: TrendPoint[] = [
   { m: "Jan", total: 6_320_000 },
   { m: "Feb", total: 6_180_000 },
   { m: "Mar", total: 6_910_000 },
   { m: "Apr", total: 6_540_000 },
-  { m: "Mei", total: 0 },
-  { m: "Jun", total: 0 },
-  { m: "Jul", total: 0 },
-  { m: "Agu", total: 0 },
-  { m: "Sep", total: 0 },
-  { m: "Okt", total: 0 },
-  { m: "Nov", total: 0 },
-  { m: "Des", total: 0 },
+  { m: "Mei", total: 6_730_000 },
+  { m: "Jun", total: 6_410_000 },
+  { m: "Jul", total: 6_880_000 },
+  { m: "Agu", total: 6_250_000 },
+  { m: "Sep", total: 6_700_000 },
+  { m: "Okt", total: 6_490_000 },
+  { m: "Nov", total: 6_820_000 },
+  { m: "Des", total: 6_600_000 },
 ];

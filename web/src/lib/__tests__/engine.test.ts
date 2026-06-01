@@ -11,6 +11,7 @@ import {
   fmtRpShort,
   dateLabel,
   shiftISO,
+  diffDays,
   expensesIn,
   totalThisMonth,
   spendByCategory,
@@ -178,6 +179,23 @@ test("stepPeriod wraps year boundaries", () => {
   assert.deepStrictEqual(stepPeriod({ y: 2026, m: 0 }, -1), { y: 2025, m: 11 });
   assert.deepStrictEqual(stepPeriod({ y: 2026, m: 11 }, 1), { y: 2027, m: 0 });
   assert.deepStrictEqual(stepPeriod({ y: 2026, m: 4 }, 1), { y: 2026, m: 5 });
+});
+
+test("diffDays counts whole days across month and year boundaries", () => {
+  assert.strictEqual(diffDays("2026-05-30", "2026-05-30"), 0);
+  assert.strictEqual(diffDays("2026-05-30", "2026-05-29"), 1);
+  assert.strictEqual(diffDays("2026-05-01", "2026-05-30"), -29);
+  assert.strictEqual(diffDays("2026-06-01", "2026-05-30"), 2); // crosses month
+  assert.strictEqual(diffDays("2027-01-01", "2026-12-31"), 1); // crosses year
+});
+
+test("diffDays + shiftISO round-trips (the seed-anchor shift)", () => {
+  // Shifting a date by diffDays(today, anchor) lands the anchor exactly on today.
+  const today = "2026-06-01";
+  const anchor = "2026-05-30";
+  assert.strictEqual(shiftISO(anchor, diffDays(today, anchor)), today);
+  // and a trailing date keeps its relative spacing
+  assert.strictEqual(shiftISO("2026-05-29", diffDays(today, anchor)), "2026-05-31");
 });
 
 // ── Native numeric input → integer rupiah ────────────────────────────────────

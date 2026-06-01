@@ -275,9 +275,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // template for empty early months so the demo year still looks alive).
   const trend = React.useMemo<TrendPoint[]>(() => {
     const real = yearlyTrend(expenses, period.y);
-    // Only the seed/demo year (2026) borrows baseline values for empty months.
-    if (period.y !== 2026) return real;
-    return real.map((t, i) => (t.total === 0 && MONTHLY_TREND[i] ? MONTHLY_TREND[i] : t));
+    // In the current year, decorate empty months BEFORE this month with the
+    // demo baseline so the chart looks alive; the current month uses real data
+    // and future months stay empty.
+    const now = todayPeriod();
+    if (period.y !== now.y) return real;
+    return real.map((t, i) =>
+      t.total === 0 && i < now.m && MONTHLY_TREND[i]
+        ? { m: t.m, total: MONTHLY_TREND[i].total }
+        : t
+    );
   }, [expenses, period.y]);
 
   const addExpense = React.useCallback(

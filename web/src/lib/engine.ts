@@ -168,6 +168,13 @@ export function todayISO(): string {
   return isoOf(t.y, t.m, t.d);
 }
 
+/** Whole-day difference `aIso - bIso` (both YYYY-MM-DD), calendar-accurate. */
+export function diffDays(aIso: string, bIso: string): number {
+  const [ay, am, ad] = aIso.split("-").map(Number);
+  const [by, bm, bd] = bIso.split("-").map(Number);
+  return Math.round((Date.UTC(ay, am - 1, ad) - Date.UTC(by, bm - 1, bd)) / 86_400_000);
+}
+
 /** Shift an ISO date by a number of days, calendar-safe across month/year. */
 export function shiftISO(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
