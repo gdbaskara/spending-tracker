@@ -12,7 +12,7 @@ import { Settle } from "@/screens/Settle";
 import { Settings } from "@/screens/Settings";
 import { AddModal } from "@/screens/AddModal";
 import { AllTransactions } from "@/screens/AllTransactions";
-import { periodLabel, stepPeriod } from "@/lib/engine";
+import { periodLabel, stepPeriod, dateLong, todayISO } from "@/lib/engine";
 import type { Expense } from "@/lib/types";
 
 const NAV: [NavKey, string][] = [
@@ -49,6 +49,8 @@ export function WebApp() {
   const [screen, setScreen] = React.useState<Screen>("home");
   const [adding, setAdding] = React.useState(false);
   const [editing, setEditing] = React.useState<Expense | null>(null);
+  // Real "today" label, computed once on mount (was a hardcoded placeholder).
+  const [todayLong] = React.useState(() => dateLong(todayISO()));
   const myName = profiles[me].name;
 
   if (!ready) {
@@ -124,7 +126,7 @@ export function WebApp() {
                 <div style={{ fontFamily: FREDOKA, fontWeight: 600, fontSize: "clamp(24px,3vw,30px)", color: UI.ink }}>
                   Hai, {myName}! 👋
                 </div>
-                <div style={{ fontSize: 14, color: UI.sub, fontWeight: 500, marginTop: 6 }}>Sabtu, 31 Mei 2026</div>
+                <div style={{ fontSize: 14, color: UI.sub, fontWeight: 500, marginTop: 6 }}>{todayLong}</div>
               </>
             ) : screen === "all" ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

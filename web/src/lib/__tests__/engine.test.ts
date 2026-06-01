@@ -10,6 +10,7 @@ import {
   MAX_AMOUNT,
   fmtRpShort,
   dateLabel,
+  dateLong,
   shiftISO,
   diffDays,
   expensesIn,
@@ -179,6 +180,13 @@ test("stepPeriod wraps year boundaries", () => {
   assert.deepStrictEqual(stepPeriod({ y: 2026, m: 0 }, -1), { y: 2025, m: 11 });
   assert.deepStrictEqual(stepPeriod({ y: 2026, m: 11 }, 1), { y: 2027, m: 0 });
   assert.deepStrictEqual(stepPeriod({ y: 2026, m: 4 }, 1), { y: 2026, m: 5 });
+});
+
+test("dateLong formats a long Indonesian date with correct weekday", () => {
+  // 2026-06-01 is a Monday; 2026-05-31 is a Sunday.
+  assert.strictEqual(dateLong("2026-06-01"), "Senin, 1 Juni 2026");
+  assert.strictEqual(dateLong("2026-05-31"), "Minggu, 31 Mei 2026");
+  assert.strictEqual(dateLong("2026-01-01"), "Kamis, 1 Januari 2026");
 });
 
 test("diffDays counts whole days across month and year boundaries", () => {

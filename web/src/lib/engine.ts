@@ -150,7 +150,16 @@ export const SHORT_MONTHS = [
   "Des",
 ];
 
+export const WEEKDAYS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
 const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Long Indonesian date for an ISO day, e.g. "Senin, 1 Juni 2026". */
+export function dateLong(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const wd = new Date(y, m - 1, d).getDay();
+  return `${WEEKDAYS[wd]}, ${d} ${ST_MONTHS[m - 1]} ${y}`;
+}
 
 export function isoOf(y: number, m: number, d: number): string {
   return `${y}-${pad2(m + 1)}-${pad2(d)}`;
