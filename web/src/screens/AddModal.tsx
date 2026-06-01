@@ -46,7 +46,6 @@ export function AddModal({
   const [meiShare, setMeiShare] = React.useState(editing?.shares.mei ?? 0);
 
   // Receipt scan state
-  const fileRef = React.useRef<HTMLInputElement>(null);
   const [scanning, setScanning] = React.useState(false);
   const [scanMsg, setScanMsg] = React.useState<string | null>(null);
 
@@ -73,58 +72,58 @@ export function AddModal({
   // the existing one (unless the user removed it).
   const receiptSrc = receiptPreview ?? (removeReceipt ? null : existingUrl);
 
-  // Compress + attach a chosen photo (used by scan and by manual attach/replace).
-  const attachReceipt = React.useCallback(async (file: File) => {
-    setReceiptBusy(true);
-    try {
-      const { blob, dataUrl } = await compressImage(file);
-      setReceiptBlob(blob);
-      setReceiptPreview(dataUrl);
-      setRemoveReceipt(false);
-    } catch {
-      // keep the previous receipt on failure
-    } finally {
-      setReceiptBusy(false);
-    }
-  }, []);
-
   const onRemoveReceipt = React.useCallback(() => {
     setReceiptBlob(null);
     setReceiptPreview(null);
     setRemoveReceipt(true);
   }, []);
 
-  const onPickReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-picking the same file
-    if (!file) return;
-    setScanning(true);
-    setScanMsg(null);
-    // Keep the scanned photo as the attached receipt too.
-    void attachReceipt(file);
-    try {
-      const r = await scanReceipt(file);
-      if (r.amount > 0) setAmount(r.amount);
-      if (r.category_id && categories.some((c) => c.id === r.category_id)) setCatId(r.category_id);
-      if (r.spent_at) {
-        setDate(r.spent_at);
-        // Open the calendar on an unusual (non today/yesterday) scanned date so
-        // the user can verify it; collapse it back for the quick dates.
-        setShowCal(!quickDates.includes(r.spent_at));
+  // One flow for both camera and gallery: compress ONCE, attach the photo, then
+  // auto-read it to fill the fields (the same compressed image feeds storage
+  // and the OCR call). Mis-reads are still editable.
+  const addReceipt = React.useCallback(
+    async (file: File) => {
+      setReceiptBusy(true);
+      setScanMsg(null);
+      let dataUrl: string;
+      try {
+        const compressed = await compressImage(file);
+        dataUrl = compressed.dataUrl;
+        setReceiptBlob(compressed.blob);
+        setReceiptPreview(dataUrl);
+        setRemoveReceipt(false);
+      } catch {
+        setReceiptBusy(false);
+        setScanMsg("Gagal memproses gambar");
+        return;
       }
-      const note = r.description || r.merchant;
-      if (note) setDesc(note);
-      setScanMsg(
-        r.amount > 0
-          ? `Terbaca${r.confidence === "low" ? " (cek lagi ya)" : ""} — cek lalu Simpan`
-          : "Nggak nemu totalnya, isi manual ya"
-      );
-    } catch (err) {
-      setScanMsg(err instanceof Error ? err.message : "Gagal memindai struk");
-    } finally {
-      setScanning(false);
-    }
-  };
+      setReceiptBusy(false);
+
+      // Auto-read the attached photo.
+      setScanning(true);
+      try {
+        const r = await scanReceipt(dataUrl);
+        if (r.amount > 0) setAmount(r.amount);
+        if (r.category_id && categories.some((c) => c.id === r.category_id)) setCatId(r.category_id);
+        if (r.spent_at) {
+          setDate(r.spent_at);
+          setShowCal(!quickDates.includes(r.spent_at));
+        }
+        const note = r.description || r.merchant;
+        if (note) setDesc(note);
+        setScanMsg(
+          r.amount > 0
+            ? `Terbaca${r.confidence === "low" ? " (cek lagi ya)" : ""} — cek lalu Simpan`
+            : "Nggak nemu totalnya, isi manual ya"
+        );
+      } catch (err) {
+        setScanMsg(err instanceof Error ? err.message : "Gagal memindai struk");
+      } finally {
+        setScanning(false);
+      }
+    },
+    [categories, quickDates]
+  );
 
   const canSave = amount > 0;
 
@@ -209,63 +208,23 @@ export function AddModal({
           </div>
         </div>
 
-        {/* Scan receipt */}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={onPickReceipt}
-          style={{ display: "none" }}
-        />
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={scanning}
-          style={{
-            width: "100%",
-            marginTop: 6,
-            border: `1.5px dashed ${UI.accent}`,
-            borderRadius: 16,
-            padding: "12px",
-            background: UI.accentSoft,
-            color: UI.accentDk,
-            fontFamily: FREDOKA,
-            fontWeight: 600,
-            fontSize: 14.5,
-            cursor: scanning ? "default" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 9,
-          }}
-        >
-          {scanning ? (
-            <>
-              <span className="anim-blink">📷</span> Membaca struk…
-            </>
-          ) : (
-            <>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              Scan struk
-            </>
-          )}
-        </button>
-        {scanMsg && (
-          <div style={{ fontSize: 12.5, color: UI.sub, textAlign: "center", marginTop: 7, marginBottom: 4, lineHeight: 1.4 }}>{scanMsg}</div>
-        )}
-
-        {/* Receipt attachment (thumbnail + crop / replace / remove) */}
-        <div style={{ marginTop: 12 }}>
+        {/* Receipt: camera or gallery -> attach + auto-read; then crop/replace/remove */}
+        <div style={{ marginTop: 8 }}>
           <ReceiptField
             src={receiptSrc}
-            busy={receiptBusy || scanning}
-            onPick={attachReceipt}
+            busy={receiptBusy}
+            onPick={addReceipt}
             onCrop={() => receiptSrc && setCropSrc(receiptSrc)}
             onRemove={onRemoveReceipt}
           />
+          {scanning && (
+            <div style={{ fontSize: 12.5, color: UI.sub, textAlign: "center", marginBottom: 12, lineHeight: 1.4 }}>
+              <span className="anim-blink">📷</span> Membaca struk…
+            </div>
+          )}
+          {!scanning && scanMsg && (
+            <div style={{ fontSize: 12.5, color: UI.sub, textAlign: "center", marginBottom: 12, lineHeight: 1.4 }}>{scanMsg}</div>
+          )}
         </div>
 
         {/* Amount — native numeric keyboard (system numpad on mobile) */}

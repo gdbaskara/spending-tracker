@@ -1,10 +1,10 @@
 "use client";
 
 import { getSupabase } from "./supabase";
-import { compressImage } from "./image";
 
-// Client helper: downscale a captured receipt photo (privacy + payload size),
-// POST it to the scan endpoint, and return the structured result.
+// Client helper: POST an already-compressed receipt image (a data URL) to the
+// scan endpoint and return the structured result. The caller compresses once
+// (see lib/image.compressImage) and reuses that same image for storage.
 export interface ScanResult {
   amount: number;
   spent_at: string | null;
@@ -14,11 +14,7 @@ export interface ScanResult {
   confidence: "high" | "medium" | "low";
 }
 
-export async function scanReceipt(file: File): Promise<ScanResult> {
-  // Reuse the shared compressor (resize + JPEG) for the OCR payload.
-  const { dataUrl: base64 } = await compressImage(file);
-  const mimeType = "image/jpeg";
-
+export async function scanReceipt(base64: string, mimeType = "image/jpeg"): Promise<ScanResult> {
   // Attach the Supabase session token so the server can verify the caller is
   // logged in (the scan endpoint is gated to authenticated users).
   const sb = getSupabase();
