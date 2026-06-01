@@ -6,23 +6,26 @@ import { UI, FREDOKA } from "@/lib/ui";
 interface ReceiptFieldProps {
   src: string | null; // current receipt preview, null if none/removed
   busy?: boolean; // compressing / reading the image
-  onPick: (file: File) => void; // attach or replace from a chosen photo
+  // Attach a photo. `scan` requests auto-OCR (true from camera, false from gallery).
+  onPick: (file: File, scan: boolean) => void;
   onCrop: () => void; // open the crop/rotate editor
   onRemove: () => void; // drop the receipt
+  onScan?: () => void; // read the attached photo on demand
+  canScan?: boolean; // a freshly attached photo is available to read
 }
 
-// Single receipt control. When empty it offers two sources — Kamera (capture)
-// and Galeri (existing photo) — so both attach paths work. Once a photo is
-// attached it shows a thumbnail with view / crop / replace / remove.
-export function ReceiptField({ src, busy, onPick, onCrop, onRemove }: ReceiptFieldProps) {
+// Single receipt control. When empty it offers two sources: Kamera (capture,
+// auto-reads) and Galeri (attach only). Once a photo is attached it shows a
+// thumbnail with read / crop / replace / remove.
+export function ReceiptField({ src, busy, onPick, onCrop, onRemove, onScan, canScan }: ReceiptFieldProps) {
   const cameraRef = React.useRef<HTMLInputElement>(null); // forces the camera
   const galleryRef = React.useRef<HTMLInputElement>(null); // camera OR gallery
   const [viewing, setViewing] = React.useState(false);
 
-  const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const pick = (scan: boolean) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) onPick(file);
+    if (file) onPick(file, scan);
   };
 
   const sourceBtn: React.CSSProperties = {
@@ -56,8 +59,8 @@ export function ReceiptField({ src, busy, onPick, onCrop, onRemove }: ReceiptFie
 
   return (
     <>
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={pick} style={{ display: "none" }} />
-      <input ref={galleryRef} type="file" accept="image/*" onChange={pick} style={{ display: "none" }} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={pick(true)} style={{ display: "none" }} />
+      <input ref={galleryRef} type="file" accept="image/*" onChange={pick(false)} style={{ display: "none" }} />
 
       {src ? (
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
@@ -70,6 +73,11 @@ export function ReceiptField({ src, busy, onPick, onCrop, onRemove }: ReceiptFie
             <img src={src} alt="Struk" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: busy ? 0.5 : 1 }} />
           </button>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {onScan && canScan && (
+              <button onClick={onScan} disabled={busy} style={{ ...smallBtn, color: UI.accentDk, background: UI.accentSoft }}>
+                Baca otomatis
+              </button>
+            )}
             <button onClick={onCrop} disabled={busy} style={smallBtn}>
               Crop &amp; putar
             </button>

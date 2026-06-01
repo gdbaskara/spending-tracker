@@ -78,29 +78,11 @@ export function AddModal({
     setRemoveReceipt(true);
   }, []);
 
-  // One flow for both camera and gallery: compress ONCE, attach the photo, then
-  // auto-read it to fill the fields (the same compressed image feeds storage
-  // and the OCR call). Mis-reads are still editable.
-  const addReceipt = React.useCallback(
-    async (file: File) => {
-      setReceiptBusy(true);
-      setScanMsg(null);
-      let dataUrl: string;
-      try {
-        const compressed = await compressImage(file);
-        dataUrl = compressed.dataUrl;
-        setReceiptBlob(compressed.blob);
-        setReceiptPreview(dataUrl);
-        setRemoveReceipt(false);
-      } catch {
-        setReceiptBusy(false);
-        setScanMsg("Gagal memproses gambar");
-        return;
-      }
-      setReceiptBusy(false);
-
-      // Auto-read the attached photo.
+  // Read a compressed receipt (data URL) and fill the fields from the OCR.
+  const runScan = React.useCallback(
+    async (dataUrl: string) => {
       setScanning(true);
+      setScanMsg(null);
       try {
         const r = await scanReceipt(dataUrl);
         if (r.amount > 0) setAmount(r.amount);
@@ -124,6 +106,32 @@ export function AddModal({
     },
     [categories, quickDates]
   );
+
+  // Attach a photo (compress ONCE — reused for storage and OCR). Camera shots
+  // auto-read; gallery picks attach only and can be read on demand.
+  const addReceipt = React.useCallback(
+    async (file: File, scan: boolean) => {
+      setReceiptBusy(true);
+      setScanMsg(null);
+      try {
+        const { blob, dataUrl } = await compressImage(file);
+        setReceiptBlob(blob);
+        setReceiptPreview(dataUrl);
+        setRemoveReceipt(false);
+        setReceiptBusy(false);
+        if (scan) await runScan(dataUrl);
+      } catch {
+        setReceiptBusy(false);
+        setScanMsg("Gagal memproses gambar");
+      }
+    },
+    [runScan]
+  );
+
+  // "Baca otomatis" on a freshly attached photo (e.g. one chosen from gallery).
+  const rescan = React.useCallback(() => {
+    if (receiptPreview) void runScan(receiptPreview);
+  }, [receiptPreview, runScan]);
 
   const canSave = amount > 0;
 
@@ -216,6 +224,8 @@ export function AddModal({
             onPick={addReceipt}
             onCrop={() => receiptSrc && setCropSrc(receiptSrc)}
             onRemove={onRemoveReceipt}
+            onScan={rescan}
+            canScan={!!receiptPreview && !scanning}
           />
           {scanning && (
             <div style={{ fontSize: 12.5, color: UI.sub, textAlign: "center", marginBottom: 12, lineHeight: 1.4 }}>
