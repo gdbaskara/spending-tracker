@@ -8,10 +8,13 @@ import { CatIcon, Avatar } from "@/components/primitives";
 import { CuteCalendar } from "@/components/CuteCalendar";
 import { PROFILES } from "@/lib/seed";
 import { scanReceipt } from "@/lib/scan";
+import { compressImage } from "@/lib/image";
 import type { Expense, PersonId, SplitType } from "@/lib/types";
 import { AmountInput } from "./add/AmountInput";
 import { DeleteConfirmOverlay } from "./add/DeleteConfirmOverlay";
 import { SavedOverlay } from "./add/SavedOverlay";
+import { ReceiptField } from "./add/ReceiptField";
+import { CropEditor } from "./add/CropEditor";
 import { seg, segWrap, fieldLabel, chip } from "./add/styles";
 
 export function AddModal({
@@ -21,7 +24,7 @@ export function AddModal({
   onClose: () => void;
   editing?: Expense; // when set, the modal edits this expense instead of adding
 }) {
-  const { categories, addExpense, editExpense, deleteExpense, me } = useStore();
+  const { categories, addExpense, editExpense, deleteExpense, me, receiptUrl } = useStore();
   const isEdit = !!editing;
   // Real today/yesterday — stable for the lifetime of this modal instance.
   const [today] = React.useState(todayISO);
@@ -47,12 +50,58 @@ export function AddModal({
   const [scanning, setScanning] = React.useState(false);
   const [scanMsg, setScanMsg] = React.useState<string | null>(null);
 
+  // Receipt attachment state
+  const [receiptBlob, setReceiptBlob] = React.useState<Blob | null>(null); // new/replacement
+  const [receiptPreview, setReceiptPreview] = React.useState<string | null>(null); // data URL of the above
+  const [existingUrl, setExistingUrl] = React.useState<string | null>(null); // edit: resolved existing receipt
+  const [removeReceipt, setRemoveReceipt] = React.useState(false);
+  const [cropSrc, setCropSrc] = React.useState<string | null>(null);
+  const [receiptBusy, setReceiptBusy] = React.useState(false);
+
+  // Edit mode: resolve a viewable URL for the already-saved receipt.
+  React.useEffect(() => {
+    let alive = true;
+    if (editing?.receipt_path) {
+      receiptUrl(editing.receipt_path).then((u) => alive && setExistingUrl(u));
+    }
+    return () => {
+      alive = false;
+    };
+  }, [editing, receiptUrl]);
+
+  // What the receipt field/editor shows: a freshly picked image wins; otherwise
+  // the existing one (unless the user removed it).
+  const receiptSrc = receiptPreview ?? (removeReceipt ? null : existingUrl);
+
+  // Compress + attach a chosen photo (used by scan and by manual attach/replace).
+  const attachReceipt = React.useCallback(async (file: File) => {
+    setReceiptBusy(true);
+    try {
+      const { blob, dataUrl } = await compressImage(file);
+      setReceiptBlob(blob);
+      setReceiptPreview(dataUrl);
+      setRemoveReceipt(false);
+    } catch {
+      // keep the previous receipt on failure
+    } finally {
+      setReceiptBusy(false);
+    }
+  }, []);
+
+  const onRemoveReceipt = React.useCallback(() => {
+    setReceiptBlob(null);
+    setReceiptPreview(null);
+    setRemoveReceipt(true);
+  }, []);
+
   const onPickReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-picking the same file
     if (!file) return;
     setScanning(true);
     setScanMsg(null);
+    // Keep the scanned photo as the attached receipt too.
+    void attachReceipt(file);
     try {
       const r = await scanReceipt(file);
       if (r.amount > 0) setAmount(r.amount);
@@ -105,6 +154,8 @@ export function AddModal({
         split === "custom"
           ? { mei: Math.min(meiShare, amount), bas: amount - Math.min(meiShare, amount) }
           : undefined,
+      receiptBlob: receiptBlob ?? undefined,
+      removeReceipt,
     };
     if (isEdit && editing) {
       editExpense(editing.id, input);
@@ -114,7 +165,7 @@ export function AddModal({
       setSaved(true);
       setTimeout(onClose, 1100);
     }
-  }, [canSave, amount, catId, payer, desc, date, split, meiShare, addExpense, editExpense, isEdit, editing, onClose]);
+  }, [canSave, amount, catId, payer, desc, date, split, meiShare, receiptBlob, removeReceipt, addExpense, editExpense, isEdit, editing, onClose]);
 
   const doDelete = React.useCallback(() => {
     if (editing) deleteExpense(editing.id);
@@ -203,8 +254,19 @@ export function AddModal({
           )}
         </button>
         {scanMsg && (
-          <div style={{ fontSize: 12.5, color: UI.sub, textAlign: "center", marginTop: 7, lineHeight: 1.4 }}>{scanMsg}</div>
+          <div style={{ fontSize: 12.5, color: UI.sub, textAlign: "center", marginTop: 7, marginBottom: 4, lineHeight: 1.4 }}>{scanMsg}</div>
         )}
+
+        {/* Receipt attachment (thumbnail + crop / replace / remove) */}
+        <div style={{ marginTop: 12 }}>
+          <ReceiptField
+            src={receiptSrc}
+            busy={receiptBusy || scanning}
+            onPick={attachReceipt}
+            onCrop={() => receiptSrc && setCropSrc(receiptSrc)}
+            onRemove={onRemoveReceipt}
+          />
+        </div>
 
         {/* Amount — native numeric keyboard (system numpad on mobile) */}
         <div style={{ textAlign: "center", padding: "14px 0 18px" }}>
@@ -351,6 +413,20 @@ export function AddModal({
 
         {/* Celebration */}
         {saved && <SavedOverlay amount={amount} categoryName={cat?.name} />}
+
+        {/* Crop & rotate editor */}
+        {cropSrc && (
+          <CropEditor
+            src={cropSrc}
+            onCancel={() => setCropSrc(null)}
+            onDone={(img) => {
+              setReceiptBlob(img.blob);
+              setReceiptPreview(img.dataUrl);
+              setRemoveReceipt(false);
+              setCropSrc(null);
+            }}
+          />
+        )}
       </div>
     </div>
   );

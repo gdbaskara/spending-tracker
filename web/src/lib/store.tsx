@@ -51,6 +51,8 @@ interface AddExpenseInput {
   spent_at: string;
   split_type: SplitType;
   customShares?: Shares; // only when split_type === 'custom'
+  receiptBlob?: Blob | null; // new/replacement compressed receipt to store
+  removeReceipt?: boolean; // edit: drop the existing receipt
 }
 
 // Transient bottom toast, used to offer "Urungkan" (undo) after a delete.
@@ -89,6 +91,7 @@ interface StoreValue {
   addExpense: (input: AddExpenseInput) => Promise<void>;
   editExpense: (id: string, input: AddExpenseInput) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
+  receiptUrl: (path: string | null | undefined) => Promise<string | null>;
   settleUp: () => Promise<void>;
   toggleRecurring: (id: string) => Promise<void>;
   addRecurring: (r: Omit<Recurring, "id">) => Promise<void>;
@@ -112,6 +115,15 @@ const Ctx = React.createContext<StoreValue | null>(null);
 
 function uid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(new Error("Gagal membaca gambar"));
+    r.readAsDataURL(blob);
+  });
 }
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -309,12 +321,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (sb) {
           const saved = await db.insertExpense(sb, householdId, base);
           if (saved) {
+            // Upload the receipt under the new id, then persist its path.
+            if (input.receiptBlob) {
+              const path = await db.uploadReceipt(sb, householdId, saved.id, input.receiptBlob);
+              if (path) {
+                saved.receipt_path = path;
+                await db.updateExpense(sb, householdId, saved);
+              }
+            }
             setExpenses((prev) => [saved, ...prev]);
             return;
           }
         }
       }
-      setExpenses((prev) => [{ ...base, id: uid("e") }, ...prev]);
+      // Local mode: keep the image inline as a data URL.
+      const localReceipt = input.receiptBlob ? await blobToDataUrl(input.receiptBlob) : null;
+      setExpenses((prev) => [{ ...base, id: uid("e"), receipt_path: localReceipt }, ...prev]);
     },
     [mode, householdId]
   );
@@ -325,39 +347,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         input.split_type === "custom" && input.customShares
           ? input.customShares
           : computeShares(input.amount, input.split_type, input.payer_id, { owner: input.payer_id });
-      setExpenses((prev) =>
-        prev.map((e) =>
-          e.id === id
-            ? {
-                ...e,
-                spent_at: input.spent_at,
-                category_id: input.category_id,
-                payer_id: input.payer_id,
-                amount: input.amount,
-                description: input.description,
-                split_type: input.split_type,
-                owner: input.split_type === "full" ? input.payer_id : undefined,
-                shares,
-              }
-            : e
-        )
-      );
-      if (mode === "live" && householdId) {
-        const sb = getSupabase();
-        const updated = expenses.find((e) => e.id === id);
-        if (sb && updated) {
-          await db.updateExpense(sb, householdId, {
-            ...updated,
-            spent_at: input.spent_at,
-            category_id: input.category_id,
-            payer_id: input.payer_id,
-            amount: input.amount,
-            description: input.description,
-            split_type: input.split_type,
-            owner: input.split_type === "full" ? input.payer_id : undefined,
-            shares,
-          });
+      const prevExpense = expenses.find((e) => e.id === id);
+      const sb = mode === "live" && householdId ? getSupabase() : null;
+
+      // Resolve the receipt: remove, replace, or keep the existing one.
+      let receipt_path = prevExpense?.receipt_path ?? null;
+      if (input.removeReceipt) {
+        if (sb) await db.removeReceipt(sb, receipt_path);
+        receipt_path = null;
+      } else if (input.receiptBlob) {
+        if (sb && householdId) {
+          receipt_path = (await db.uploadReceipt(sb, householdId, id, input.receiptBlob)) ?? receipt_path;
+        } else {
+          receipt_path = await blobToDataUrl(input.receiptBlob);
         }
+      }
+
+      const patch = {
+        spent_at: input.spent_at,
+        category_id: input.category_id,
+        payer_id: input.payer_id,
+        amount: input.amount,
+        description: input.description,
+        split_type: input.split_type,
+        owner: input.split_type === "full" ? input.payer_id : undefined,
+        shares,
+        receipt_path,
+      };
+      setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+
+      if (sb && householdId && prevExpense) {
+        await db.updateExpense(sb, householdId, { ...prevExpense, ...patch });
       }
     },
     [mode, householdId, expenses]
@@ -632,6 +652,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [mode, householdId]
   );
 
+  // Resolve a receipt path to a viewable URL: a short-lived signed URL in live
+  // mode, or the inline data URL kept in local mode.
+  const receiptUrl = React.useCallback(async (path: string | null | undefined): Promise<string | null> => {
+    if (!path) return null;
+    if (path.startsWith("data:")) return path;
+    const sb = getSupabase();
+    return sb ? db.signedReceiptUrl(sb, path) : null;
+  }, []);
+
   const value: StoreValue = {
     ready,
     mode,
@@ -657,6 +686,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     addExpense,
     editExpense,
     deleteExpense: removeExpense,
+    receiptUrl,
     settleUp,
     toggleRecurring,
     addRecurring,

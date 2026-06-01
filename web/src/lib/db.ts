@@ -139,6 +139,7 @@ interface ExpenseRow {
   recurring: boolean | null;
   share_mei: number;
   share_bas: number;
+  receipt_path: string | null;
 }
 
 function rowToExpense(e: ExpenseRow): Expense {
@@ -153,6 +154,7 @@ function rowToExpense(e: ExpenseRow): Expense {
     owner: e.owner ?? undefined,
     recurring: e.recurring ?? false,
     shares: { mei: e.share_mei, bas: e.share_bas },
+    receipt_path: e.receipt_path ?? null,
   };
 }
 
@@ -175,6 +177,7 @@ export async function insertExpense(
       share_mei: e.shares.mei,
       share_bas: e.shares.bas,
       recurring: e.recurring ?? false,
+      receipt_path: e.receipt_path ?? null,
     })
     .select("*")
     .single();
@@ -200,10 +203,41 @@ export async function updateExpense(
       owner: e.owner ?? null,
       share_mei: e.shares.mei,
       share_bas: e.shares.bas,
+      receipt_path: e.receipt_path ?? null,
     })
     .eq("household_id", householdId)
     .eq("id", e.id);
   return !error;
+}
+
+// ── Receipt storage (private "receipts" bucket; see migration 0006) ──────────
+const RECEIPTS = "receipts";
+
+/** Upload a compressed receipt for an expense; returns its storage path. */
+export async function uploadReceipt(
+  sb: SupabaseClient,
+  householdId: string,
+  expenseId: string,
+  blob: Blob
+): Promise<string | null> {
+  const path = `${householdId}/${expenseId}.jpg`;
+  const { error } = await sb.storage
+    .from(RECEIPTS)
+    .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+  return error ? null : path;
+}
+
+/** Delete a stored receipt object (no-op for null/local data URLs). */
+export async function removeReceipt(sb: SupabaseClient, path: string | null | undefined): Promise<void> {
+  if (!path || path.startsWith("data:")) return;
+  await sb.storage.from(RECEIPTS).remove([path]);
+}
+
+/** Short-lived signed URL to view a private receipt (1 hour). */
+export async function signedReceiptUrl(sb: SupabaseClient, path: string): Promise<string | null> {
+  if (path.startsWith("data:")) return path; // local mode keeps inline data URLs
+  const { data, error } = await sb.storage.from(RECEIPTS).createSignedUrl(path, 3600);
+  return error ? null : data?.signedUrl ?? null;
 }
 
 export async function deleteExpense(

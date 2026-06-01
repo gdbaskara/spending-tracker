@@ -35,6 +35,9 @@ export interface Expense {
   owner?: PersonId; // only for split_type === 'full'
   recurring?: boolean;
   shares: Shares; // SUM(shares) === amount
+  // Stored receipt. Live mode: a Storage object path "<household>/<id>.jpg".
+  // Local mode: a data: URL held in memory. null/undefined = no receipt.
+  receipt_path?: string | null;
 }
 
 export interface Settlement {
