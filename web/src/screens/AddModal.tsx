@@ -107,10 +107,10 @@ export function AddModal({
     [categories, quickDates]
   );
 
-  // Attach a photo (compress ONCE — reused for storage and OCR). Camera shots
-  // auto-read; gallery picks attach only and can be read on demand.
+  // Attach a photo (compress ONCE — reused for storage and OCR), then auto-read
+  // it to fill the fields. Mis-reads stay editable; "Baca otomatis" re-reads.
   const addReceipt = React.useCallback(
-    async (file: File, scan: boolean) => {
+    async (file: File) => {
       setReceiptBusy(true);
       setScanMsg(null);
       try {
@@ -119,7 +119,7 @@ export function AddModal({
         setReceiptPreview(dataUrl);
         setRemoveReceipt(false);
         setReceiptBusy(false);
-        if (scan) await runScan(dataUrl);
+        await runScan(dataUrl);
       } catch {
         setReceiptBusy(false);
         setScanMsg("Gagal memproses gambar");

@@ -6,20 +6,18 @@ import { UI, FREDOKA } from "@/lib/ui";
 interface ReceiptFieldProps {
   src: string | null; // current receipt preview, null if none/removed
   busy?: boolean; // compressing / reading the image
-  // Attach a photo. `scan` requests auto-OCR (true from camera, false from gallery).
-  onPick: (file: File, scan: boolean) => void;
+  onPick: (file: File) => void; // attach or replace from a chosen photo
   onCrop: () => void; // open the crop/rotate editor
   onRemove: () => void; // drop the receipt
   onScan?: () => void; // read the attached photo on demand
   canScan?: boolean; // a freshly attached photo is available to read
 }
 
-// Single receipt control. When empty it offers two sources: Kamera (capture,
-// auto-reads) and Galeri (attach only). Once a photo is attached it shows a
-// thumbnail with read / crop / replace / remove.
+// Single receipt control. One picker (no `capture`, so iOS/Android offer Take
+// Photo / Photo Library / Files); once a photo is attached it shows a thumbnail
+// with read / crop / replace / remove.
 export function ReceiptField({ src, busy, onPick, onCrop, onRemove, onScan, canScan }: ReceiptFieldProps) {
-  const cameraRef = React.useRef<HTMLInputElement>(null); // forces the camera
-  const galleryRef = React.useRef<HTMLInputElement>(null); // camera OR gallery
+  const fileRef = React.useRef<HTMLInputElement>(null);
   const [viewing, setViewing] = React.useState(false);
 
   // Never leave the lightbox open for an image that's gone (e.g. after removal).
@@ -41,14 +39,14 @@ export function ReceiptField({ src, busy, onPick, onCrop, onRemove, onScan, canS
     return () => window.removeEventListener("keydown", onKey, true);
   }, [viewing]);
 
-  const pick = (scan: boolean) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (file) onPick(file, scan);
+    if (file) onPick(file);
   };
 
   const sourceBtn: React.CSSProperties = {
-    flex: 1,
+    width: "100%",
     border: `1.5px dashed ${UI.accent}`,
     borderRadius: 14,
     padding: "13px",
@@ -56,12 +54,12 @@ export function ReceiptField({ src, busy, onPick, onCrop, onRemove, onScan, canS
     color: UI.accentDk,
     fontFamily: FREDOKA,
     fontWeight: 600,
-    fontSize: 14,
+    fontSize: 14.5,
     cursor: busy ? "default" : "pointer",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 9,
   };
   const smallBtn: React.CSSProperties = {
     border: "none",
@@ -78,8 +76,7 @@ export function ReceiptField({ src, busy, onPick, onCrop, onRemove, onScan, canS
 
   return (
     <>
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={pick(true)} style={{ display: "none" }} />
-      <input ref={galleryRef} type="file" accept="image/*" onChange={pick(false)} style={{ display: "none" }} />
+      <input ref={fileRef} type="file" accept="image/*" onChange={pick} style={{ display: "none" }} />
 
       {src ? (
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
@@ -100,7 +97,7 @@ export function ReceiptField({ src, busy, onPick, onCrop, onRemove, onScan, canS
             <button onClick={onCrop} disabled={busy} style={smallBtn}>
               Crop &amp; putar
             </button>
-            <button onClick={() => galleryRef.current?.click()} disabled={busy} style={smallBtn}>
+            <button onClick={() => fileRef.current?.click()} disabled={busy} style={smallBtn}>
               Ganti
             </button>
             <button onClick={onRemove} disabled={busy} style={{ ...smallBtn, color: UI.bad }}>
@@ -109,12 +106,9 @@ export function ReceiptField({ src, busy, onPick, onCrop, onRemove, onScan, canS
           </div>
         </div>
       ) : (
-        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          <button onClick={() => cameraRef.current?.click()} disabled={busy} style={sourceBtn}>
-            <CameraIcon /> {busy ? "Memproses…" : "Kamera"}
-          </button>
-          <button onClick={() => galleryRef.current?.click()} disabled={busy} style={sourceBtn}>
-            <GalleryIcon /> Galeri
+        <div style={{ marginBottom: 16 }}>
+          <button onClick={() => fileRef.current?.click()} disabled={busy} style={sourceBtn}>
+            <CameraIcon /> {busy ? "Memproses…" : "Foto struk"}
           </button>
         </div>
       )}
@@ -141,16 +135,6 @@ function CameraIcon() {
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
       <circle cx="12" cy="13" r="4" />
-    </svg>
-  );
-}
-
-function GalleryIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <path d="M21 15l-5-5L5 21" />
     </svg>
   );
 }
