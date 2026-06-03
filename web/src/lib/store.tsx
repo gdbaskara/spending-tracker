@@ -766,4 +766,13 @@ export function useLiveProfiles(): Record<PersonId, Profile> {
   return v?.profiles ?? PROFILES;
 }
 
+// Non-throwing accessor for the live category map (id -> Category). Used by
+// CatIcon so expenses tagged with a user-created category render that category's
+// icon/color instead of falling back to the seed default. Falls back to the seed
+// map when rendered outside the provider.
+export function useCategoryMap(): Record<string, Category> {
+  const v = React.useContext(Ctx);
+  return v?.categoryMap ?? CATEGORIES;
+}
+
 export { CATEGORIES };

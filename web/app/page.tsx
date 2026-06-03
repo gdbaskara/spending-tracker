@@ -1,10 +1,5 @@
-import { StoreProvider } from "@/lib/store";
-import { WebApp } from "@/components/WebApp";
+import { AppGate } from "./AppGate";
 
 export default function Page() {
-  return (
-    <StoreProvider>
-      <WebApp />
-    </StoreProvider>
-  );
+  return <AppGate />;
 }

@@ -1,7 +1,7 @@
 import React from "react";
 import { UI, FREDOKA } from "@/lib/ui";
 import { CATEGORIES } from "@/lib/seed";
-import { useLiveProfiles } from "@/lib/store";
+import { useLiveProfiles, useCategoryMap } from "@/lib/store";
 import { CAT_GLYPHS } from "./icons";
 import type { Category, PersonId } from "@/lib/types";
 
@@ -17,7 +17,10 @@ export function CatIcon({
   radius?: number;
   category?: Category;
 }) {
-  const c = category ?? CATEGORIES[cat ?? "lainnya"] ?? CATEGORIES.lainnya;
+  // Resolve the id against the live category map so user-created categories
+  // render their own icon/color (the seed map only has the built-in ones).
+  const map = useCategoryMap();
+  const c = category ?? map[cat ?? "lainnya"] ?? CATEGORIES.lainnya;
   const r = radius ?? size * 0.34;
   const g = size * 0.62;
   return (
