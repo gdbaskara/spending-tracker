@@ -126,7 +126,15 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-export function StoreProvider({ children }: { children: React.ReactNode }) {
+export function StoreProvider({
+  children,
+  forceLocal = false,
+}: {
+  children: React.ReactNode;
+  // When true, the store stays in offline/demo mode (seed data) and never tries
+  // to read a session or switch to live mode. Used by the public /demo route.
+  forceLocal?: boolean;
+}) {
   const [ready, setReady] = React.useState(false);
   const [mode, setMode] = React.useState<"local" | "live">("local");
   const [me, setMe] = React.useState<PersonId>("mei");
@@ -159,6 +167,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Demo route: skip auth entirely and stay on seed data.
+      if (forceLocal) {
+        setReady(true);
+        return;
+      }
       const sb = getSupabase();
       if (!sb) {
         setReady(true);
@@ -205,7 +218,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [forceLocal]);
 
   // Realtime sync: when live, subscribe to the household's ledger tables so one
   // partner's edits appear on the other's device. Any change re-pulls a fresh
